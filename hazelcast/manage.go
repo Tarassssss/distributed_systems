@@ -34,7 +34,7 @@ func main() {
 	}
 	//m.Destroy(ctx)
 	client.Shutdown(ctx)*/
-	manageOptimisticLock()
+	manageConnections()
 	
 }
 
@@ -59,11 +59,8 @@ func updateWithoutLock(port string, ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	fmt.Println("got map on port " + port)
-	for i := 0; i < 1000; i++{
-		m.Put(ctx, key, i)
-	}
-	for i := 0; i < 1000; i++ {	
-		//m.Put(ctx, i, i)
+	m.Put(ctx, key, 0)
+	for i := 0; i < 1000; i++ {		
 		content, err := m.Get(ctx, key)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
@@ -95,6 +92,7 @@ func updateWithPessimisticLock(port string, ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	fmt.Println("got map on port " + port)
+	testMap.Put(ctx, key, 0)
 	for i := 0; i < 1000; i++ {
 		_ = testMap.Lock(ctx, key)
 		fmt.Println("№ ", i, " locked on port " + port)
@@ -129,10 +127,10 @@ func updateWithOptimisticLock(port string, ctx context.Context) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	
+	testMap.Put(ctx, key, 0)
 	fmt.Println("got map on port " + port)
 	for i := 0; i < 1000; i++ {
 		for {
-			testMap.Put(ctx, key, i)
 			value, _ := testMap.Get(ctx, key)
 			fmt.Println("oldvalue ", value, " retrieved on port "+port)
 			newVal := value.(int64) + 1
