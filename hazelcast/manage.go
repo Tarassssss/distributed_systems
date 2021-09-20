@@ -13,7 +13,7 @@ import (
 	//"github.com/golang-collections/collections"
 	"time"
 	//"github.com/hazelcast/hazelcast-go-client/serialization"
-	"strconv"
+	//"strconv"
 	//"github.com/hazelcast/hazelcast-go-client/config"
     //"github.com/hazelcast/hazelcast-go-client/config/property"
     
@@ -24,7 +24,7 @@ var httpClient = &http.Client{}
 var key = "key"
 
 func main() {
-	ctx := context.TODO()
+	/*ctx := context.TODO()
 	client, _ := hazelcast.StartNewClient(ctx)
 	m, _ := client.GetMap(ctx, "map")
 	for i := 0; i < 1000; i++ {
@@ -33,8 +33,8 @@ func main() {
 
 	}
 	//m.Destroy(ctx)
-	client.Shutdown(ctx)
-	//manageConnections()
+	client.Shutdown(ctx)*/
+	manageOptimisticLock()
 	
 }
 
@@ -60,11 +60,11 @@ func updateWithoutLock(port string, ctx context.Context) {
 	defer cancel()
 	fmt.Println("got map on port " + port)
 	for i := 0; i < 1000; i++{
-		m.Put(ctx, i, i)
+		m.Put(ctx, key, i)
 	}
 	for i := 0; i < 1000; i++ {	
 		//m.Put(ctx, i, i)
-		content, err := m.Get(ctx, i)
+		content, err := m.Get(ctx, key)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				break
@@ -73,7 +73,7 @@ func updateWithoutLock(port string, ctx context.Context) {
 		}
 		newVal := content.(int64) + 1
 		time.Sleep(10 * time.Millisecond)
-		oldVal, _ := m.Put(ctx, i, newVal)
+		oldVal, _ := m.Put(ctx, key, newVal)
 		fmt.Println("№ ", i, "updated successfully on port "+ port, " value is: ", newVal, "old value is: ", oldVal, " old must be ", content)
 	}
 	client.Shutdown(ctx)
@@ -96,7 +96,6 @@ func updateWithPessimisticLock(port string, ctx context.Context) {
 	defer cancel()
 	fmt.Println("got map on port " + port)
 	for i := 0; i < 1000; i++ {
-		key:= i
 		_ = testMap.Lock(ctx, key)
 		fmt.Println("№ ", i, " locked on port " + port)
 		value, _ := testMap.Get(ctx, key)
@@ -133,12 +132,12 @@ func updateWithOptimisticLock(port string, ctx context.Context) {
 	fmt.Println("got map on port " + port)
 	for i := 0; i < 1000; i++ {
 		for {
-			testMap.Put(ctx, i, i)
-			value, _ := testMap.Get(ctx, i)
+			testMap.Put(ctx, key, i)
+			value, _ := testMap.Get(ctx, key)
 			fmt.Println("oldvalue ", value, " retrieved on port "+port)
 			newVal := value.(int64) + 1
 			time.Sleep(20 * time.Millisecond)
-			isReplaced, _ := testMap.ReplaceIfSame(ctx, i, value, newVal)
+			isReplaced, _ := testMap.ReplaceIfSame(ctx, key, value, newVal)
 			if isReplaced {
 				fmt.Println("№ ", i, " port: "+port, " || value updated successfully from ", value, " to ", newVal)
 				break
