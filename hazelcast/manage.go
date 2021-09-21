@@ -146,8 +146,9 @@ func manageOptimisticLock() {
 }
 
 func replaceIfSame(ctx context.Context, key string, val interface{}, newVal interface{}, m *hazelcast.Map) bool{
-	if val == newVal{
-		m.PutIfAbsent(ctx, key, newVal)
+	contained, _ := m.Get(ctx, key)
+	if val == contained{
+		m.Put(ctx, key, newVal)
 		return true
 	} else {
 		return false}
@@ -161,7 +162,6 @@ func updateWithOptimisticLock(port string, ctx context.Context) {
 	}
 	//ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	//defer cancel()
-	
 	fmt.Println("got map on port " + port)
 	testMap.PutIfAbsent(ctx, key, 0)
 	for i := 0; i < 1000; i++ {
