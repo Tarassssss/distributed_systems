@@ -84,7 +84,7 @@ func updateWithoutLock(port string, ctx context.Context) {
 	if err != nil || endRes == nil {
 		endMap.Put(ctx, "end", 1)
 	} else if endRes == 2{
-		testMap.Destroy(ctx)
+		m.Destroy(ctx)
 		client.Shutdown(ctx)
 	} else {
 		endRes2 := endRes.(int64) + 1
@@ -145,13 +145,20 @@ func manageOptimisticLock() {
 	updateWithOptimisticLock("5701", ctx) 	
 }
 
+func replaceIfSame(ctx context.Context, key string, val interface{}, newVal interface{}, m *hazelcast.Map) bool{
+	if val == newVal{
+		m.PutIfAbsent(ctx, key, newVal)
+		return true
+	} else {
+		return false}
+}
+
 func updateWithOptimisticLock(port string, ctx context.Context) {
 	client := getClient(port, ctx)
 	testMap, err := client.GetMap(ctx, "map")
 	if err != nil {
 		log.Fatal(err)
 	}
-	
 	//ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	//defer cancel()
 	
@@ -163,7 +170,7 @@ func updateWithOptimisticLock(port string, ctx context.Context) {
 			fmt.Println("oldvalue ", value, " retrieved on port "+port)
 			newVal := value.(int64) + 1
 			time.Sleep(1 * time.Millisecond)
-			isReplaced, _ := testMap.ReplaceIfSame(ctx, key, value, newVal)
+			isReplaced := replaceIfSame(ctx, key, value, newVal, testMap)
 			if isReplaced {
 				fmt.Println("№ ", i, " port: "+port, " || value updated successfully from ", value, " to ", newVal)
 				break
