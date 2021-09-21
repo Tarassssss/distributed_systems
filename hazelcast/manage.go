@@ -40,6 +40,12 @@ func main() {
 
 func manageConnections() {
 	ctx := context.Background()
+	client := getClient("5701", ctx)
+	testMap, err := client.GetMap(ctx, "map")
+	if err != nil {
+		log.Fatal(err)
+	}
+	testMap.Put(ctx, key, 0)
 	go updateWithoutLock("5701", ctx)
 	go updateWithoutLock("5702", ctx)
 	updateWithoutLock("5703", ctx)
@@ -51,15 +57,15 @@ func updateWithoutLock(port string, ctx context.Context) {
 	config := hazelcast.NewConfig()
 	config.Cluster.Network.SetAddresses("localhost:" + port)	
 	client, _ := hazelcast.StartNewClientWithConfig(ctx, config)
-	m, err := client.GetMap(ctx, "foo")
+	m, err := client.GetMap(ctx, "map")
 	if err != nil {
 		log.Fatal(err)
 	}
 	
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	//defer cancel()
 	fmt.Println("got map on port " + port)
-	m.Put(ctx, key, 0)
+	
 	for i := 0; i < 1000; i++ {		
 		content, err := m.Get(ctx, key)
 		if err != nil {
@@ -78,6 +84,12 @@ func updateWithoutLock(port string, ctx context.Context) {
 
 func managePessimisticLock() {
 	ctx := context.Background()
+	client := getClient("5701", ctx)
+	testMap, err := client.GetMap(ctx, "map")
+	if err != nil {
+		log.Fatal(err)
+	}
+	testMap.Put(ctx, key, 0)
 	go updateWithPessimisticLock("5701", ctx)
 	go updateWithPessimisticLock("5702", ctx)
 	updateWithPessimisticLock("5703", ctx)
@@ -85,14 +97,13 @@ func managePessimisticLock() {
 
 func updateWithPessimisticLock(port string, ctx context.Context) {
 	client := getClient(port, ctx)
-	testMap, err := client.GetMap(ctx, "foo")
+	testMap, err := client.GetMap(ctx, "map")
 	if err != nil {
 		log.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	//defer cancel()
 	fmt.Println("got map on port " + port)
-	testMap.Put(ctx, key, 0)
 	for i := 0; i < 1000; i++ {
 		_ = testMap.Lock(ctx, key)
 		fmt.Println("№ ", i, " locked on port " + port)
@@ -112,9 +123,15 @@ func updateWithPessimisticLock(port string, ctx context.Context) {
 }
 func manageOptimisticLock() {
 	ctx := context.Background()
-	go updateWithOptimisticLock("5701", ctx)
+	client := getClient("5701", ctx)
+	testMap, err := client.GetMap(ctx, "map")
+	if err != nil {
+		log.Fatal(err)
+	}
+	testMap.Put(ctx, key, 0)
+	go updateWithOptimisticLock("5703", ctx)
 	go updateWithOptimisticLock("5702", ctx)
-	updateWithOptimisticLock("5703", ctx)
+	updateWithOptimisticLock("5701", ctx) 	
 }
 
 func updateWithOptimisticLock(port string, ctx context.Context) {
@@ -124,17 +141,17 @@ func updateWithOptimisticLock(port string, ctx context.Context) {
 		log.Fatal(err)
 	}
 	
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	//defer cancel()
 	
-	testMap.Put(ctx, key, 0)
+	
 	fmt.Println("got map on port " + port)
 	for i := 0; i < 1000; i++ {
 		for {
 			value, _ := testMap.Get(ctx, key)
 			fmt.Println("oldvalue ", value, " retrieved on port "+port)
 			newVal := value.(int64) + 1
-			time.Sleep(20 * time.Millisecond)
+			time.Sleep(1 * time.Millisecond)
 			isReplaced, _ := testMap.ReplaceIfSame(ctx, key, value, newVal)
 			if isReplaced {
 				fmt.Println("№ ", i, " port: "+port, " || value updated successfully from ", value, " to ", newVal)
