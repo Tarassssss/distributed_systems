@@ -78,8 +78,17 @@ func updateWithoutLock(port string, ctx context.Context) {
 		oldVal, _ := m.Put(ctx, key, newVal)
 		fmt.Println("№ ", i, "updated successfully on port "+ port, " value is: ", newVal, "old value is: ", oldVal, " old must be ", content)
 	}
-	m.Destroy(ctx)
-	client.Shutdown(ctx)
+	endMap, _ := client.GetMap(ctx, "map")
+	endRes, err := endMap.Get(ctx, "end")
+
+	if err != nil || endRes == nil {
+		endMap.Put(ctx, "end", 1)
+	} else if endRes == 2{
+		testMap.Destroy(ctx)
+		client.Shutdown(ctx)
+	} else {
+		endRes2 := endRes.(int64) + 1
+		endMap.Put(ctx, "end", endRes2)}
 }
 
 func managePessimisticLock() {
@@ -117,8 +126,17 @@ func updateWithPessimisticLock(port string, ctx context.Context) {
 			fmt.Println("№ ", i, " updated successfully on port "+port, " value is: ", newVal, "old value is: ", oldVal, "old must be ", value)
 		}
 	}
-	testMap.Destroy(ctx)
-	client.Shutdown(ctx)
+	endMap, _ := client.GetMap(ctx, "map")
+	endRes, err := endMap.Get(ctx, "end")
+
+	if err != nil || endRes == nil {
+		endMap.Put(ctx, "end", 1)
+	} else if endRes == 2{
+		testMap.Destroy(ctx)
+		client.Shutdown(ctx)
+	} else {
+		endRes2 := endRes.(int64) + 1
+		endMap.Put(ctx, "end", endRes2)}
 }
 func manageOptimisticLock() {
 	ctx := context.Background()
@@ -138,10 +156,7 @@ func updateWithOptimisticLock(port string, ctx context.Context) {
 	//defer cancel()
 	
 	fmt.Println("got map on port " + port)
-	startVal, _ := testMap.Get(ctx, key)
-	if startVal == nil{
-		testMap.Put(ctx, key, 0)
-	}
+	testMap.PutIfAbsent(ctx, key, 0)
 	for i := 0; i < 1000; i++ {
 		for {
 			value, _ := testMap.Get(ctx, key)
@@ -157,8 +172,18 @@ func updateWithOptimisticLock(port string, ctx context.Context) {
 			}
 		}
 	}
-	testMap.Destroy(ctx)
-	client.Shutdown(ctx)
+	endMap, _ := client.GetMap(ctx, "map")
+	endRes, err := endMap.Get(ctx, "end")
+
+	if err != nil || endRes == nil {
+		endMap.Put(ctx, "end", 1)
+	} else if endRes == 2{
+		testMap.Destroy(ctx)
+		client.Shutdown(ctx)
+	} else {
+		endRes2 := endRes.(int64) + 1
+		endMap.Put(ctx, "end", endRes2)}
+	
 }
 
 func manageQueue() {
