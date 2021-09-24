@@ -5,10 +5,14 @@ import (
 	"net/http"
 )
 
+const MsgServicesNotResponding = "all logging services are not responding"
 const Localhost = "http://127.0.0.1"
 const FacadeAddress = ":23000"
-const LoggingServiceAddress = ":23001"
-const MessagesServiceAddress = ":23002"
+var LoggingServiceAddress = [...]string{":23001", ":23002", ":23003"}
+var HazelcastAddress = [...]string{":5701", ":5702", ":5703"}
+const MessagesServiceAddress = ":23102"
+
+var LoggerPortsSize = len(LoggingServiceAddress)
 
 type RequestInfo struct {
 	Id  string
@@ -19,11 +23,11 @@ type RequestData struct {
 	Msg string
 }
 
-func GetData(serverAddress string) string {
+func GetData(serverAddress string) (string, error)  {
 	loggingResp, err := http.Get(Localhost + serverAddress)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	body, _ := ioutil.ReadAll(loggingResp.Body)
-	return string(body)
+	return string(body), nil
 }
