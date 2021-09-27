@@ -10,9 +10,16 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"github.com/streadway/amqp"
 )
 
+var ch *amqp.Channel
+var messageQueue amqp.Queue
+
 func main() {
+	conn, _ := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	ch, _ = conn.Channel()
+	messageQueue, _ = ch.QueueDeclare("messaging_service", true, false, false, false, nil)
 	panic(http.ListenAndServe(basement.FacadeAddress, &FacadeResponse{}))
 }
 
@@ -23,7 +30,7 @@ func (m *FacadeResponse) ServeHTTP(writer http.ResponseWriter, request *http.Req
 	if request.Method == "GET" {
 		responseBody = listLogs() + "\n" + listMessages()
 	} else if request.Method == "POST" {
-		body, err := ioutil.ReadAll(request.Body)
+		/*body, err := ioutil.ReadAll(request.Body)
 		if err != nil {
 			panic(err)
 		}
@@ -34,7 +41,10 @@ func (m *FacadeResponse) ServeHTTP(writer http.ResponseWriter, request *http.Req
 		}
 		info := basement.RequestInfo{Id: uuid.New().String(), Msg: text.Msg}
 		messageToLogging, _ := json.Marshal(info)
-		err = sendToLogger(messageToLogging)
+		err = sendToLogger(messageToLogging)*/
+		reqParams := parseRequest(request)
+		err := sendToLogger(reqParams)
+		sendToMessenger(reqParams)
 		if err != nil {
 			responseBody = err.Error()
 		} else {
@@ -56,18 +66,31 @@ func listLogs() string {
 	return basement.MsgServicesNotResponding
 }
 
+func parseRequest(request *http.Request) basement.RequestData {
+	body, _ := ioutil.ReadAll(request.Body)
+	var params basement.RequestData
+	_ = json.Unmarshal(body, &params)
+	return params
+}
+
 func listMessages() string {
-	messages, _ := basement.GetData(basement.MessagesServiceAddress)
+	i := rand.Int() % 3
+	messageServiceAddress := basement.MessagesServiceAddress[i]
+	messages, _ := basement.GetData(messageServiceAddress)
 	return messages
 }
 
-func sendToLogger(message []byte) error {
+//func sendToLogger(message []byte) error {
+func sendToLogger(reqParams basement.RequestData) error {
+	info := basement.RequestInfo{Id: uuid.New().String(), Msg: reqParams.Msg}
+	logRequestMessage, _ := json.Marshal(info)	
 	for tryCount := 0; tryCount < 15; tryCount++ {
 		i := rand.Int() % 3
 		_, err := http.Post(
 			basement.Localhost+basement.LoggingServiceAddress[i],
 			"application/json",
-			bytes.NewReader(message))
+			//bytes.NewReader(message))
+			bytes.NewReader(logRequestMessage))
 		if err == nil {
 			return nil
 		} else {
@@ -76,4 +99,13 @@ func sendToLogger(message []byte) error {
 		}
 	}
 	return errors.New(basement.MsgServicesNotResponding)
+}
+
+func sendToMessenger(reqParams basement.RequestData) {
+	_ = ch.Publish(
+		"", messageQueue.Name, false, false,
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body:        []byte(reqParams.Msg),
+		})
 }
